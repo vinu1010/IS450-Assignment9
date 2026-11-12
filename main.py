@@ -3,24 +3,32 @@
 A small command-line program that lets a user record expenses, view them
 (sorted or filtered), and see totals per category.
 
-Stage 2 changes:
+Stage 2 changes (AI-assisted):
   * Added get_valid_amount(), which validates money input instead of crashing.
   * Added a "Filter / sort expenses" menu option (filter_and_sort_expenses()).
 
-Mmanual-feature branch:
+Assignment 9 (manual-feature branch):
   * Added a "Delete expense" menu option (delete_expense()).
+
+Assignment 9 (ai-feature branch, AI-primary):
+  * Added save/load of expenses to a JSON file so data survives restarts.
 """
+
+import json
 
 # Each expense is stored as a dictionary: {"description": str, "category": str, "amount": float}
 # All expenses live in this list while the program runs (nothing is saved to disk).
 expenses = []
+
+# File used to store expenses between runs (created in the current folder).
+DATA_FILE = "expenses.json"
 
 
 def get_valid_amount(prompt):
     """Keep asking until the user enters a positive number; return it as a float.
 
     Stage 1 used float(input(...)) directly, so typing "abc" crashed the
-    program with a ValueError. try/except lets catch that error and ask again.
+    program with a ValueError. try/except lets us catch that error and ask again.
     """
     while True:
         text = input(prompt)
@@ -73,7 +81,7 @@ def view_expenses():
 
 
 def filter_and_sort_expenses():
-    """NEW feature: optionally filter by category, then sort by amount."""
+    """NEW in Stage 2: optionally filter by category, then sort by amount."""
     if len(expenses) == 0:
         print("No expenses yet.")
         return
@@ -151,8 +159,43 @@ def show_totals():
     print(f"Overall total: ${overall:.2f}")
 
 
+def save_expenses():
+    """Write the current expenses list to DATA_FILE as JSON."""
+    try:
+        with open(DATA_FILE, "w") as file:
+            json.dump(expenses, file, indent=2)
+        print(f"Saved {len(expenses)} expense(s) to {DATA_FILE}.")
+    except OSError as error:
+        # e.g. folder is read-only; report it instead of crashing the program
+        print(f"Could not save expenses: {error}")
+
+
+def load_expenses():
+    """Load expenses from DATA_FILE at startup; start empty if it is missing or unusable."""
+    try:
+        with open(DATA_FILE) as file:
+            loaded = json.load(file)
+    except FileNotFoundError:
+        return  # first run: nothing saved yet, which is normal
+    except (json.JSONDecodeError, OSError):
+        print(f"Could not read {DATA_FILE}; starting with no expenses.")
+        return
+
+    # Keep only well-formed entries so a hand-edited file cannot break later code.
+    for item in loaded if isinstance(loaded, list) else []:
+        if (isinstance(item, dict)
+                and isinstance(item.get("description"), str)
+                and isinstance(item.get("category"), str)
+                and isinstance(item.get("amount"), (int, float))
+                and item["amount"] > 0):
+            expenses.append(item)
+    print(f"Loaded {len(expenses)} expense(s) from {DATA_FILE}.")
+
+
 def main():
     """Show the menu repeatedly until the user chooses to quit."""
+    load_expenses()  # restore anything saved during a previous run
+
     # Repeat the menu until the user selects the exit option.
     while True:
         print("\n--- Expense Tracker ---")
@@ -161,7 +204,8 @@ def main():
         print("3. Filter / sort expenses")
         print("4. Show totals")
         print("5. Delete expense")
-        print("6. Quit")
+        print("6. Save expenses to file")
+        print("7. Quit")
         choice = input("Choose an option: ")
 
         if choice == "1":
@@ -175,10 +219,12 @@ def main():
         elif choice == "5":
             delete_expense()
         elif choice == "6":
+            save_expenses()
+        elif choice == "7":
             print("Goodbye!")
             break
         else:
-            print("Invalid choice, please enter 1-6.")
+            print("Invalid choice, please enter 1-7.")
 
 
 main()
